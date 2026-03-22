@@ -32,7 +32,9 @@ def get_device():
 def load_wav2vec2():
     print(f"📥 Loading {WAV2VEC_MODEL}...")
     processor = Wav2Vec2Processor.from_pretrained(WAV2VEC_MODEL)
-    model     = Wav2Vec2Model.from_pretrained(WAV2VEC_MODEL)
+    model     = Wav2Vec2Model.from_pretrained(
+                    WAV2VEC_MODEL,
+                    use_safetensors=True)   # ← avoids torch.load entirely
     device    = get_device()
     model     = model.to(device).eval()
     print(f"✅ wav2vec2 ready on {device}")

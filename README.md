@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🎙️ Speech Emotion Recognition
 ### Task #46 — Al-Farabi University | Department of Computer Engineering
 
@@ -176,3 +177,7 @@ python src/predict.py --file path/to/audio.wav
 ## 📜 License
 
 Academic coursework — Al-Farabi University. RAVDESS used under CC BY-NC-SA.
+=======
+# speech-emotion-recognition
+Speech Emotion Recognition using wav2vec2 + Statistical MFCC + SVM | Task #46 | Al-Farabi University
+>>>>>>> 357bc18755d2f72262412d95a06d3517d6b1551b

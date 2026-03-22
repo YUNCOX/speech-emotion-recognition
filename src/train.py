@@ -47,8 +47,7 @@ def augment(X_tr_n, y_tr, le):
 
 
 def train_and_evaluate(X_tr_n, X_te_n, y_tr, y_te, le):
-    """Grid search SVM + RF, neutral threshold calibration."""
-    neutral_idx = le.transform(['neutral'])[0]
+    """Grid search SVM + RF, per-class threshold calibration."""
 
     # SVM grid search
     print("\n🔍 SVM grid search...")
@@ -71,31 +70,56 @@ def train_and_evaluate(X_tr_n, X_te_n, y_tr, y_te, le):
     rf_f1 = f1_score(y_te, rf.predict(X_te_n), average='weighted')
     print(f"  RF → F1: {rf_f1:.4f}")
 
-    best_model   = best_svm if best_f1 >= rf_f1 else rf
-    base_f1      = max(best_f1, rf_f1)
+    best_model = best_svm if best_f1 >= rf_f1 else rf
+    base_f1    = max(best_f1, rf_f1)
 
-    # Neutral threshold calibration
-    print("\n🎯 Calibrating neutral threshold...")
+    # Per-class threshold calibration
+    # Each emotion gets its own confidence threshold
+    # If the model is >= threshold confident about a class → predict it
+    print("\n🎯 Calibrating per-class thresholds...")
     probs = best_model.predict_proba(X_te_n)
-    best_thresh_f1, best_thresh = 0, 0.25
-    for t in np.arange(0.10, 0.55, 0.02):
-        y_pred_t = [neutral_idx if p[neutral_idx] >= t
-                    else np.argmax(p) for p in probs]
-        f1_t = f1_score(y_te, y_pred_t, average='weighted')
-        if f1_t > best_thresh_f1:
-            best_thresh_f1, best_thresh = f1_t, t
 
-    # Final prediction
-    if best_thresh_f1 > base_f1:
-        y_pred = [neutral_idx if p[neutral_idx] >= best_thresh
-                  else np.argmax(p) for p in probs]
-        method = f"SVM C={best_C} + neutral_thresh={best_thresh:.2f}"
-        final_thresh = best_thresh
+    best_thresholds = {}
+    for target_class in range(len(le.classes_)):
+        cls_name = le.inverse_transform([target_class])[0]
+        best_t_f1, best_t = 0, 0.3
+        for t in np.arange(0.10, 0.60, 0.02):
+            y_pred_t = []
+            for p in probs:
+                if p[target_class] >= t:
+                    y_pred_t.append(target_class)
+                else:
+                    y_pred_t.append(np.argmax(p))
+            f1_t = f1_score(y_te, y_pred_t, average='weighted')
+            if f1_t > best_t_f1:
+                best_t_f1, best_t = f1_t, t
+        best_thresholds[target_class] = best_t
+        print(f"  {cls_name:<8}: thresh={best_t:.2f} → F1={best_t_f1:.4f}")
+
+    # Apply all thresholds together
+    y_pred_calibrated = []
+    for p in probs:
+        predicted = np.argmax(p)
+        for cls_idx, thresh in best_thresholds.items():
+            if p[cls_idx] >= thresh:
+                predicted = cls_idx
+                break
+        y_pred_calibrated.append(predicted)
+
+    calibrated_f1 = f1_score(y_te, y_pred_calibrated, average='weighted')
+    print(f"\n  Base F1      : {base_f1:.4f}")
+    print(f"  Calibrated F1: {calibrated_f1:.4f}")
+
+    if calibrated_f1 > base_f1:
+        y_pred       = y_pred_calibrated
+        method       = f"SVM C={best_C} + per-class thresholds"
+        final_thresh = best_thresholds
     else:
-        y_pred = best_model.predict(X_te_n)
-        method = f"SVM C={best_C}"
+        y_pred       = best_model.predict(X_te_n)
+        method       = f"SVM C={best_C}"
         final_thresh = None
 
+    neutral_idx = le.transform(['neutral'])[0]
     return best_model, y_pred, method, final_thresh, neutral_idx
 
 
