@@ -26,7 +26,7 @@ def predict_file(filepath, payload, processor, w2v_model, device):
     model         = payload['model']
     scaler        = payload['scaler']
     le            = payload['label_encoder']
-    neutral_thresh = payload.get('neutral_threshold')
+    neutral_thresh = payload.get('thresholds') or payload.get('neutral_threshold')
     neutral_idx   = payload.get('neutral_idx', 2)
 
     # Extract combined features

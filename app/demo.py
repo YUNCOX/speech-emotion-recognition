@@ -100,14 +100,7 @@ def run_prediction(tmp_path):
     feat_n = scaler.transform(np.hstack([w2v, mfcc]))
     probs  = svm_model.predict_proba(feat_n)[0]
 
-    if isinstance(thresholds, dict):
-        idx = np.argmax(probs)
-        for ci, th in thresholds.items():
-            if probs[ci] >= th:
-                idx = ci
-                break
-    else:
-        idx = np.argmax(probs)
+    idx = np.argmax(probs)
 
     label      = le.inverse_transform([idx])[0]
     confidence = float(probs.max() * 100)
@@ -243,7 +236,6 @@ with gr.Blocks(theme=gr.themes.Base(),
 
             analyse_btn = gr.Button("🔍 Analyse Emotion",
                                     variant="primary", size="lg")
-
             gr.Markdown("### 🎭 Predicted Emotion")
             result_html = gr.Markdown(value="🎙️ *Record or upload audio to get prediction*")
 
@@ -255,9 +247,13 @@ with gr.Blocks(theme=gr.themes.Base(),
     gr.HTML(emotions_html)
 
     # Mic tab events
+    def predict_either(mic, upload):
+        audio = mic if mic is not None else upload
+        return predict_from_audio(audio)
+
     analyse_btn.click(
-        fn=predict_from_audio,
-        inputs=[mic_input],
+        fn=predict_either,
+        inputs=[mic_input, file_input],
         outputs=[result_html, conf_plot, spec_plot]
     )
 
