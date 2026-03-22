@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.env
+venv/
+env/
+data/
+*.wav
+models/*.pkl
+models/embeddings_cache.pkl
+results/*.png
+results/*.json
+.DS_Store
+.vscode/settings.json
+*.ipynb_checkpoints
