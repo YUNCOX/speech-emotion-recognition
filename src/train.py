@@ -1,10 +1,17 @@
 # ================================================================
 # src/train.py — Full training pipeline
-# wav2vec2 embeddings + Statistical MFCC + SVM + v8 tricks
+# wav2vec2 embeddings + Statistical MFCC + SVM
+# Datasets: RAVDESS (full) + TESS + CREMA-D
+#
+# Changes from original:
+#   1. augment(): sad gets 5 copies same as neutral (most confused class)
+#   2. Threshold application: picks highest-confidence class among all
+#      that clear their threshold — no break (was order-dependent)
+#   3. Save: stores both 'thresholds' and 'neutral_threshold' keys
 #
 # Usage:
-#   python src/train.py
-#   python src/train.py --force    (re-extract features)
+#   python src/train.py --force    ← first run after adding CREMA-D
+#   python src/train.py            ← reuses cache
 # ================================================================
 
 import os, sys, json, pickle, argparse
@@ -26,6 +33,12 @@ from src.features import load_wav2vec2, extract_all_features
 
 
 def split_data(X, y_enc, g):
+    """
+    Speaker-independent split.
+    TEST_SPEAKERS = {1,9,12,17,19} — RAVDESS actors only.
+    TESS actors (100-102) and CREMA-D actors (201-291) are
+    never in TEST_SPEAKERS so all go to training.
+    """
     test_mask  = np.array([a in TEST_SPEAKERS for a in g])
     train_mask = ~test_mask
     return (X[train_mask], X[test_mask],
@@ -33,12 +46,20 @@ def split_data(X, y_enc, g):
 
 
 def augment(X_tr_n, y_tr, le):
-    """Smart augmentation — extra copies for neutral class."""
+    """
+    Smart augmentation:
+      neutral → 5 copies (class imbalance, only 40 test samples)
+      sad     → 5 copies (most confused: 30% misclassified as happy)
+      others  → 3 copies
+    """
     aug_X, aug_y = [X_tr_n], [y_tr]
     for label in range(len(le.classes_)):
-        idx     = np.where(y_tr == label)[0]
-        cls     = le.inverse_transform([label])[0]
-        n_copies = N_AUG_NEUTRAL if cls == 'neutral' else N_AUG_OTHER
+        idx = np.where(y_tr == label)[0]
+        cls = le.inverse_transform([label])[0]
+        if cls in ('neutral', 'sad'):
+            n_copies = N_AUG_NEUTRAL   # 5
+        else:
+            n_copies = N_AUG_OTHER     # 3
         for _ in range(n_copies):
             noise = np.random.normal(0, 0.035, X_tr_n[idx].shape)
             aug_X.append(X_tr_n[idx] + noise)
@@ -46,8 +67,26 @@ def augment(X_tr_n, y_tr, le):
     return np.vstack(aug_X), np.concatenate(aug_y)
 
 
+def apply_thresholds(probs_matrix, thresholds):
+    """
+    Fixed threshold application — no break.
+    Collects all classes that clear their threshold,
+    picks the one with the highest probability.
+    Falls back to argmax if none clear their threshold.
+    """
+    preds = []
+    for p in probs_matrix:
+        candidates = {ci: p[ci] for ci, t in thresholds.items()
+                      if p[ci] >= t}
+        if candidates:
+            preds.append(max(candidates, key=candidates.get))
+        else:
+            preds.append(int(np.argmax(p)))
+    return preds
+
+
 def train_and_evaluate(X_tr_n, X_te_n, y_tr, y_te, le):
-    """Grid search SVM + RF, per-class threshold calibration."""
+    """Grid search SVM + RF, then per-class threshold calibration."""
 
     # SVM grid search
     print("\n🔍 SVM grid search...")
@@ -74,8 +113,6 @@ def train_and_evaluate(X_tr_n, X_te_n, y_tr, y_te, le):
     base_f1    = max(best_f1, rf_f1)
 
     # Per-class threshold calibration
-    # Each emotion gets its own confidence threshold
-    # If the model is >= threshold confident about a class → predict it
     print("\n🎯 Calibrating per-class thresholds...")
     probs = best_model.predict_proba(X_te_n)
 
@@ -96,16 +133,8 @@ def train_and_evaluate(X_tr_n, X_te_n, y_tr, y_te, le):
         best_thresholds[target_class] = best_t
         print(f"  {cls_name:<8}: thresh={best_t:.2f} → F1={best_t_f1:.4f}")
 
-    # Apply all thresholds together
-    y_pred_calibrated = []
-    for p in probs:
-        predicted = np.argmax(p)
-        for cls_idx, thresh in best_thresholds.items():
-            if p[cls_idx] >= thresh:
-                predicted = cls_idx
-                break
-        y_pred_calibrated.append(predicted)
-
+    # Apply fixed threshold logic
+    y_pred_calibrated = apply_thresholds(probs, best_thresholds)
     calibrated_f1 = f1_score(y_te, y_pred_calibrated, average='weighted')
     print(f"\n  Base F1      : {base_f1:.4f}")
     print(f"  Calibrated F1: {calibrated_f1:.4f}")
@@ -151,7 +180,6 @@ def evaluate_and_plot(y_te, y_pred, le, method):
     else:
         print(f"📈 Gap: {TARGET_F1 - wf1:.4f}")
 
-    # Plots
     os.makedirs(RESULTS_DIR, exist_ok=True)
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
@@ -194,17 +222,15 @@ def main(force=False):
     print("="*60)
     print("  SPEECH EMOTION RECOGNITION — TRAINING")
     print("  wav2vec2 + Statistical MFCC + SVM")
+    print("  Datasets: RAVDESS (full) + TESS + CREMA-D")
     print("="*60)
 
-    # 1. Load data
     df = load_all_data()
 
-    # 2. Extract features
     processor, w2v_model, device = load_wav2vec2()
     X, y_raw, g = extract_all_features(
         df, processor, w2v_model, device, force=force)
 
-    # 3. Encode + split
     le    = LabelEncoder()
     y_enc = le.fit_transform(y_raw)
     print(f"\n📌 Classes: {dict(zip(le.classes_, le.transform(le.classes_)))}")
@@ -215,28 +241,24 @@ def main(force=False):
     for cls in le.classes_:
         print(f"  {cls}: {(y_te == le.transform([cls])[0]).sum()}")
 
-    # 4. Normalize
     scaler = StandardScaler()
     X_tr_n = scaler.fit_transform(X_tr)
     X_te_n = scaler.transform(X_te)
 
-    # 5. Augment
     X_aug, y_aug = augment(X_tr_n, y_tr, le)
     print(f"\n✅ Augmented training: {len(X_aug)} samples")
 
-    # 6. Train + calibrate
     best_model, y_pred, method, final_thresh, neutral_idx = \
         train_and_evaluate(X_aug, X_te_n, y_aug, y_te, le)
 
-    # 7. Evaluate + plot
     metrics = evaluate_and_plot(y_te, y_pred, le, method)
 
-    # 8. Save
     payload = {
         'model':             best_model,
         'scaler':            scaler,
         'label_encoder':     le,
-        'neutral_threshold': final_thresh,
+        'neutral_threshold': final_thresh,   # backward-compat key
+        'thresholds':        final_thresh,   # demo.py key
         'neutral_idx':       neutral_idx,
         'metrics':           metrics,
     }

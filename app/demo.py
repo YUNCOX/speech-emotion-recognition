@@ -100,7 +100,16 @@ def run_prediction(tmp_path):
     feat_n = scaler.transform(np.hstack([w2v, mfcc]))
     probs  = svm_model.predict_proba(feat_n)[0]
 
-    idx = np.argmax(probs)
+    # Fixed threshold logic: pick highest-confidence class among those
+    # that clear their threshold. Falls back to argmax if none do.
+    # (Original argmax ignored thresholds entirely; the previous fix
+    # used break which made class order decide the winner.)
+    if isinstance(thresholds, dict):
+        candidates = {ci: probs[ci] for ci, t in thresholds.items()
+                      if probs[ci] >= t}
+        idx = max(candidates, key=candidates.get) if candidates else int(np.argmax(probs))
+    else:
+        idx = int(np.argmax(probs))
 
     label      = le.inverse_transform([idx])[0]
     confidence = float(probs.max() * 100)

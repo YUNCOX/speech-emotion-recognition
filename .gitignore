@@ -1,14 +1,36 @@
+# ── Python ────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
-.env
-venv/
-env/
-data/
-*.wav
+*.pyo
+.Python
+*.egg-info/
+
+# ── VS Code ───────────────────────────────────────────────────────
+.vscode/
+
+# ── Jupyter ───────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Model & cache files (too large for GitHub) ────────────────────
 models/*.pkl
-models/embeddings_cache.pkl
-results/*.png
-results/*.json
+*.pkl
+
+# ── Datasets (too large for GitHub) ──────────────────────────────
+data/ravdess/
+data/tess/
+data/cremad/
+data/**/*.wav
+data/**/*.WAV
+
+# ── Temp scripts ─────────────────────────────────────────────────
+fix_ravdess.py
+add_ravdess_song.py
+
+# ── Keep empty dirs tracked ───────────────────────────────────────
+!models/.gitkeep
+!data/.gitkeep
+!results/.gitkeep
+
+# ── OS ────────────────────────────────────────────────────────────
 .DS_Store
-.vscode/settings.json
-*.ipynb_checkpoints
+Thumbs.db

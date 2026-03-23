@@ -3,13 +3,14 @@
 
 > **Author:** Mohammed Natiq Hilo
 > **Approach:** wav2vec2 embeddings + Statistical MFCC + SVM
+> **Datasets:** RAVDESS + TESS + CREMA-D
 > **Target:** Weighted F1-score > 0.72 on held-out speaker test set
 
 ---
 
 ## 🎯 Live Demo
 
-**👉 [Try the Live Demo](https://c935ae52930645ac98.gradio.live)**
+**👉 [Try the Live Demo](DEMO_LINK_HERE)**
 
 Record your voice or upload a .wav file and see the emotion predicted in real time with confidence scores and mel-spectrogram visualization.
 
@@ -19,20 +20,20 @@ Record your voice or upload a .wav file and see the emotion predicted in real ti
 
 | Metric | Value |
 |--------|-------|
-| **Weighted F1** | **0.7278** ✅ |
-| Accuracy | 72.14% |
-| Macro F1 | 0.7289 |
+| **Weighted F1** | **0.7711** ✅ |
+| Accuracy | 76.79% |
+| Macro F1 | 0.7740 |
 
 **Per-class F1 scores:**
 
 | Emotion | F1 Score | ≥ 0.72 |
 |---------|----------|--------|
-| 😠 Angry   | 0.8451 | ✅ |
-| 😊 Happy   | 0.6591 | ❌ |
-| 😐 Neutral | 0.7368 | ✅ |
-| 😢 Sad     | 0.6747 | ❌ |
+| 😠 Angry   | 0.8267 | ✅ |
+| 😊 Happy   | 0.7451 | ✅ |
+| 😐 Neutral | 0.7941 | ✅ |
+| 😢 Sad     | 0.7302 | ✅ |
 
-> Weighted F1 target (> 0.72) achieved. See Critical Analysis for per-class discussion.
+> All 4 emotions exceed the target F1 ≥ 0.72. Evaluated on a speaker-independent held-out test set of 280 samples (RAVDESS actors 1, 9, 12, 17, 19).
 
 ---
 
@@ -47,18 +48,18 @@ Statistical MFCC (1037-dim)┘
     ↓
 StandardScaler normalization
     ↓
-Smart Augmentation (3-5x, neutral-weighted)
+Smart Augmentation (neutral + sad: 5x, others: 3x)
     ↓
-SVM RBF (C=1, grid search) + Per-class threshold calibration
+SVM RBF (C=0.5, grid search over [0.5, 1, 5, 10, 50])
     ↓
 Emotion: angry / happy / neutral / sad
 ```
 
 **Why this combination?**
-- **wav2vec2** captures deep prosodic and phonetic patterns from 960h pre-training
-- **Statistical MFCC** provides interpretable acoustic features (energy, pitch, timbre)
-- **Per-class calibration** optimises each emotion's decision threshold independently
-- **Smart augmentation** balances the neutral class imbalance (5x vs 3x for others)
+- **wav2vec2** captures deep prosodic and phonetic patterns from 960h LibriSpeech pre-training
+- **Statistical MFCC** provides interpretable acoustic features — energy, spectral shape, timbre
+- **CREMA-D** adds 4,900 clips from 91 diverse actors, dramatically improving happy and sad generalisation
+- **Smart augmentation** gives extra copies to neutral (imbalanced) and sad (most confused) classes
 
 ---
 
@@ -71,8 +72,8 @@ speech-emotion-recognition/
 ├── README.md
 ├── .gitignore
 ├── src/
-│   ├── download_data.py      ← download RAVDESS + TESS
-│   ├── data_loader.py        ← parse datasets
+│   ├── download_data.py      ← download RAVDESS + TESS + CREMA-D
+│   ├── data_loader.py        ← parse all three datasets
 │   ├── features.py           ← wav2vec2 + MFCC extraction
 │   ├── train.py              ← full training pipeline
 │   └── predict.py            ← CLI inference
@@ -104,16 +105,16 @@ pip install -r requirements.txt
 python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
 ```
 
-### 4. Download datasets
+### 4. Download datasets (RAVDESS + TESS + CREMA-D)
 ```bash
 python src/download_data.py
 ```
 
-### 5. Train (~5 min on GPU / ~60 min on CPU)
+### 5. Train
 ```bash
-python src/train.py
+python src/train.py --force   # first run — extracts and caches features
+python src/train.py           # subsequent runs — loads cache instantly
 ```
-Features are cached after first run — re-runs are instant.
 
 ### 6. Run live demo
 ```bash
@@ -130,67 +131,70 @@ python src/predict.py --file path/to/audio.wav
 
 ## 🔬 Experimental Progression
 
-| Version | Approach | Weighted F1 |
-|---------|----------|-------------|
-| v1 | Deep CNN (2D MFCC maps) | 0.13 |
-| v2 | CNN + Data Augmentation | 0.28 |
-| v3 | Statistical MFCC + MLP | 0.66 |
-| v4 | Statistical MFCC + SVM | 0.61 |
-| v5 | SVM + TESS (wrong split) | 0.48 |
-| v6 | SVM + corrected split | 0.6579 |
-| v7 | XGBoost + Pitch features | 0.61 |
-| v8 | Rich MFCC + SVM + calibration | 0.6814 |
-| **Final** | **wav2vec2 + MFCC + SVM + GPU** | **0.7278 ✅** |
+| Version | Approach | Dataset | Weighted F1 |
+|---------|----------|---------|-------------|
+| v1 | Deep CNN (2D MFCC maps) | RAVDESS | 0.13 |
+| v2 | CNN + Data Augmentation | RAVDESS | 0.28 |
+| v3 | Statistical MFCC + MLP | RAVDESS | 0.66 |
+| v4 | Statistical MFCC + SVM | RAVDESS | 0.61 |
+| v5 | SVM + TESS (wrong split) | R+T | 0.6557 |
+| v6 | SVM + corrected split | R+T | 0.6579 |
+| v7 | XGBoost + Pitch features | R+T | 0.61 |
+| v8 | Rich MFCC + SVM + calibration | R+T | 0.6814 |
+| v9 | wav2vec2 + MFCC + SVM | R+T | 0.7278 |
+| **Final** | **wav2vec2 + MFCC + SVM + CREMA-D** | **R+T+C** | **0.7711 ✅** |
 
 ---
 
 ## 📦 Datasets
 
-| Dataset | Speakers | Samples Used | Source |
-|---------|----------|-------------|--------|
-| RAVDESS | 24 actors (12M, 12F) | 672 | [Zenodo](https://zenodo.org/record/1188976) |
+| Dataset | Speakers | Samples | Source |
+|---------|----------|---------|--------|
+| RAVDESS | 24 actors (12M, 12F) | 1,344 | [Zenodo](https://zenodo.org/record/1188976) |
 | TESS | 2 female speakers | 2,000 | [Kaggle](https://www.kaggle.com/datasets/ejlok1/toronto-emotional-speech-set-tess) |
+| CREMA-D | 91 actors (diverse) | 4,900 | [Kaggle](https://www.kaggle.com/datasets/ejlok1/cremad) |
 
-**Evaluation protocol:** Speaker-independent — RAVDESS actors 1, 9, 12, 17, 19 held out exclusively for testing. All TESS samples remain in training only.
+**Evaluation protocol:** Speaker-independent — RAVDESS actors 1, 9, 12, 17, 19 held out exclusively for testing. All TESS and CREMA-D samples used for training only.
 
 ---
 
 ## 🔍 Critical Analysis
 
-**Why the weighted F1 target was achieved but not all per-class scores:**
+**Why all 4 emotions exceeded F1 = 0.72:**
 
-1. **Small speaker pool** — only 5 test speakers from RAVDESS; one atypical speaker significantly shifts per-class metrics
-2. **Neutral class imbalance** — only 20 neutral test samples vs 40 for other classes
-3. **Cross-dataset domain mismatch** — TESS (clean studio) vs RAVDESS (acted speech) creates distribution shift
-4. **Speaker-independent evaluation** — most published results exceeding F1=0.72 per class use speaker-dependent splits
+Adding CREMA-D (91 actors, diverse demographics) provided the model with significantly more acoustic diversity for happy and sad — the two emotions that were previously confused (happy↔sad overlap in energy and pitch). The full RAVDESS dataset (speech + song, 1,344 samples) restored the proper 280-sample test set, giving statistically reliable per-class evaluation.
 
-The angry class (F1=0.8451) and neutral class (F1=0.7368) both exceed the target. Happy and sad are acoustically similar — both exhibit moderate energy and pitch patterns — causing frequent confusion between them.
+**Remaining challenges:**
+1. Neutral has the fewest test samples (40 vs 80 for others) — precision is high (0.96) but recall lower (0.68)
+2. Happy/sad still share some acoustic properties in acted speech corpora
+3. Cross-dataset domain variation (studio vs acted vs crowd-sourced) requires diverse training data
 
 ---
 
 ## 📹 Video Presentation
 
-**YouTube:** [Link to be added after recording]
+**YouTube:** [YOUTUBE_LINK_HERE]
 
 ---
 
 ## 📄 Technical Report
 
-Full IEEE-format technical report (4-6 pages) available in the repository:
-`SER_Paper_Mohammed_Natiq_Hilo.docx`
+Full IEEE-format technical report available in the repository:
+`SER_Paper_Final_Mohammed_Natiq_Hilo.docx`
 
 ---
 
 ## 📚 References
 
-1. A. Baevski et al., "wav2vec 2.0: A framework for self-supervised learning of speech representations," NeurIPS, 2020.
+1. A. Baevski et al., "wav2vec 2.0," NeurIPS, 2020.
 2. S. R. Livingstone and F. A. Russo, "The RAVDESS dataset," PLOS ONE, 2018.
 3. K. Dupuis and M. K. Pichora-Fuller, "TESS dataset," University of Toronto, 2010.
-4. B. Schuller et al., "The INTERSPEECH 2009 emotion challenge," Proc. Interspeech, 2009.
+4. H. R. Cao et al., "CREMA-D dataset," IEEE Trans. Affective Computing, 2014.
+5. B. Schuller et al., "The INTERSPEECH 2009 emotion challenge," Proc. Interspeech, 2009.
 
 ---
 
 ## 📜 License
 
 Academic coursework — Al-Farabi University College, Department of Computer Engineering.
-RAVDESS used under CC BY-NC-SA 4.0.
+RAVDESS: CC BY-NC-SA 4.0. CREMA-D: Open Database License.

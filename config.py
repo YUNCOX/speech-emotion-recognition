@@ -2,6 +2,7 @@
 # config.py — Central configuration for Speech Emotion Recognition
 # Task #46 | Al-Farabi University | Mohammed Natiq Hilo
 # Approach: wav2vec2 embeddings + Statistical MFCC + SVM
+# Datasets: RAVDESS + TESS + CREMA-D
 # ================================================================
 
 import os
@@ -13,6 +14,7 @@ MODELS_DIR  = os.path.join(BASE_DIR, 'models')
 RESULTS_DIR = os.path.join(BASE_DIR, 'results')
 RAVDESS_DIR = os.path.join(DATA_DIR, 'ravdess')
 TESS_DIR    = os.path.join(DATA_DIR, 'tess')
+CREMAD_DIR  = os.path.join(DATA_DIR, 'cremad')
 CACHE_FILE  = os.path.join(MODELS_DIR, 'embeddings_cache.pkl')
 MODEL_FILE  = os.path.join(MODELS_DIR, 'best_ser_final.pkl')
 
@@ -31,16 +33,17 @@ EMOTION_COLOR = {'angry':'#e74c3c','happy':'#f39c12',
 RAVDESS_MAP = {'01':'neutral','03':'happy','04':'sad','05':'angry'}
 TESS_MAP    = {'angry':'angry','happy':'happy','sad':'sad',
                'neutral':'neutral','ps':'happy'}
+CREMAD_MAP  = {'ANG':'angry','HAP':'happy','NEU':'neutral','SAD':'sad'}
 
 # ── Model ─────────────────────────────────────────────────────────
 WAV2VEC_MODEL = "facebook/wav2vec2-base"
-BATCH_SIZE    = 64           # larger batch = faster on GPU
+BATCH_SIZE    = 64
 TEST_SPEAKERS = {1,9,12,17,19}
 SVM_C_VALUES  = [0.5,1,5,10,50]
 TARGET_F1     = 0.72
-N_AUG_NEUTRAL = 5            # extra augmentation copies for neutral
+N_AUG_NEUTRAL = 5
 N_AUG_OTHER   = 3
 
 # ── Ensure dirs exist ─────────────────────────────────────────────
-for d in [DATA_DIR, RAVDESS_DIR, TESS_DIR, MODELS_DIR, RESULTS_DIR]:
+for d in [DATA_DIR, RAVDESS_DIR, TESS_DIR, CREMAD_DIR, MODELS_DIR, RESULTS_DIR]:
     os.makedirs(d, exist_ok=True)
