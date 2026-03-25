@@ -38,8 +38,8 @@ print("Loading wav2vec2...")
 processor, w2v_model, device = load_wav2vec2()
 print("All ready!\n")
 
-wf1 = metrics.get('weighted_f1', 0.7278)
-acc = metrics.get('accuracy', 0.7214)
+wf1 = metrics.get('weighted_f1', 0.7711)
+acc = metrics.get('accuracy', 0.7679)
 
 BADGE = {
     'angry':   ('#e74c3c', '😠'),
@@ -100,10 +100,6 @@ def run_prediction(tmp_path):
     feat_n = scaler.transform(np.hstack([w2v, mfcc]))
     probs  = svm_model.predict_proba(feat_n)[0]
 
-    # Fixed threshold logic: pick highest-confidence class among those
-    # that clear their threshold. Falls back to argmax if none do.
-    # (Original argmax ignored thresholds entirely; the previous fix
-    # used break which made class order decide the winner.)
     if isinstance(thresholds, dict):
         candidates = {ci: probs[ci] for ci, t in thresholds.items()
                       if probs[ci] >= t}
@@ -170,7 +166,7 @@ header_html = (
     " &nbsp;·&nbsp; Computer Engineering &nbsp;·&nbsp; Task #46<br>"
     "<span style='font-size:13px'>"
     "Model: wav2vec2 + Statistical MFCC + SVM"
-    " &nbsp;|&nbsp; Dataset: RAVDESS + TESS"
+    " &nbsp;|&nbsp; Dataset: RAVDESS + TESS + CREMA-D"
     " &nbsp;|&nbsp; <b style='color:#4ade80'>Weighted F1: "
     + str(round(wf1, 4)) +
     "</b> &nbsp;|&nbsp; Accuracy: "
