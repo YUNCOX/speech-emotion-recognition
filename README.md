@@ -180,7 +180,7 @@ Adding CREMA-D (91 actors, diverse demographics) provided the model with signifi
 ## 📄 Technical Report
 
 Full IEEE-format technical report available in the repository:
-`SER_Final_Paper.docx`
+[SER_Final_Paper.docx](SER_Final_Paper.docx)
 
 ---
 
