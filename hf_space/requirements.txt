@@ -1,0 +1,20 @@
+# Speech Emotion Recognition — Requirements
+# Task #46 | Al-Farabi University | Mohammed Natiq Hilo
+#
+# Install: pip install -r requirements.txt
+#
+# NOTE: For GPU (NVIDIA RTX), install PyTorch with CUDA first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+# Then run the rest:
+#   pip install -r requirements.txt
+
+gradio
+torch
+torchaudio
+transformers
+librosa
+soundfile
+scikit-learn
+numpy
+gdown
+matplotlib
