@@ -10,7 +10,7 @@
 
 ## 🎯 Live Demo
 
-**👉 [Try the Live Demo](DEMO_LINK_HERE)**
+**👉 [Try the Live Demo](https://huggingface.co/spaces/YUNCO/speech-emotion-recognition)**
 
 Record your voice or upload a .wav file and see the emotion predicted in real time with confidence scores and mel-spectrogram visualization.
 
@@ -180,7 +180,7 @@ Adding CREMA-D (91 actors, diverse demographics) provided the model with signifi
 ## 📄 Technical Report
 
 Full IEEE-format technical report available in the repository:
-`SER_Paper_Final_Mohammed_Natiq_Hilo.docx`
+`SER_Final_Paper.docx`
 
 ---
 
